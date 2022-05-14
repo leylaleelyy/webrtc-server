@@ -1,65 +1,69 @@
-import Koa from 'koa'
-import { createServer } from 'http'
-import { Server } from 'socket.io'
-import { logger } from './logger';
+import Koa from "koa";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import { logger } from "./logger";
 
-const PORT = 3001
+const PORT = 3001;
 
-logger.info('start')
+logger.info("start");
 
-const app = new Koa()
+const app = new Koa();
 
 app.use((ctx, next) => {
-  ctx.response.body = '你好, 这里是 WebRTC 信令服务器'
-})
+  ctx.response.body = "你好, 这里是 WebRTC 信令服务器";
+});
 
-const httpServer = createServer(app.callback())
+const httpServer = createServer(app.callback());
 
 const io = new Server(httpServer, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
-})
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
 
-io.on('connection', socket => {
-  socket.on('message', (room, data) => {
-    logger.debug(`message, room: ${room}, data, type: ${data.type}`)
-    socket.to(room).emit('message', room, data)
-  })
+io.on("connection", (socket) => {
+  socket.on("message", (room, data) => {
+    logger.debug(`message, room: ${room}, data, type: ${data.type}`);
+    socket.to(room).emit("message", room, data);
+  });
 
-  socket.on('join',  async (room) => {
-    await socket.join(room)
-    const myRoom = io.sockets.adapter.rooms.get(room)
-    const userCount = myRoom?.size || 0
-    logger.debug(`the user number of room (${room}) is: ${userCount}`)
+  socket.on("join", async (room) => {
+    await socket.join(room);
+    const myRoom = io.sockets.adapter.rooms.get(room);
+    const userCount = myRoom?.size || 0;
+    logger.debug(`the user number of room (${room}) is: ${userCount}`);
 
     if (userCount <= 2) {
-      socket.emit('joined', room, socket.id, userCount)
+      socket.emit("joined", room, socket.id, userCount);
 
       if (userCount > 1) {
-        socket.to(room).emit('other_join', room, socket.id, userCount)
+        socket.to(room).emit("other_join", room, socket.id, userCount);
       }
     } else {
-      socket.leave(room)
-      socket.emit('full', room, socket.id)
+      socket.leave(room);
+      socket.emit("full", room, socket.id);
     }
-  })
+  });
 
-  socket.on('leave', (room) => {
-    socket.leave(room)
+  socket.on("add_mark", (room, mark) => {
+    console.log(mark);
+    socket.to(room).emit("marked", mark);
+  });
 
-    const myRoom = io.sockets.adapter.rooms.get(room)
-    const userCount = myRoom?.size || 0
-    logger.debug(`the user number of room (${room}) is: ${userCount}`)
+  socket.on("leave", (room) => {
+    socket.leave(room);
 
-    socket.to(room).emit('bye', room, socket.id)
+    const myRoom = io.sockets.adapter.rooms.get(room);
+    const userCount = myRoom?.size || 0;
+    logger.debug(`the user number of room (${room}) is: ${userCount}`);
 
-    socket.emit('left', room, socket.id)
-  })
+    socket.to(room).emit("bye", room, socket.id);
 
-})
+    socket.emit("left", room, socket.id);
+  });
+});
 
-httpServer.listen(PORT)
+httpServer.listen(PORT);
 
-logger.info(`listen on port ${PORT}...`)
+logger.info(`listen on port ${PORT}...`);
